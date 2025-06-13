@@ -1,0 +1,1 @@
+{\n  \"files\": [\"example1.c\"],\n  \"source_obfuscation\": [\"flattening\"],\n  \"llvm_obfuscation_levels\": 2,\n  \"llms\": [\"ChatGPT-4o\", \"Gemini\"]\n}\n
