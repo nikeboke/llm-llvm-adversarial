@@ -1,3 +1,18 @@
+# You need
+LLVM-15
+
+Ghidra 10  =>ghidra_11.3.2_PUBLIC_20250415
+
+clang-tool
+
+opt-tool
+
+llc-tool
+
+llvm-dis-tool
+
+libLLVMObfuscator.so
+
 #  LLVM Obfuscation Pipeline for `state_obfuscation.c`
 
 This document shows how to obfuscate a C program (`state_obfuscation.c`) using Obfuscator-LLVM and LLVM 14
