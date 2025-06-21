@@ -119,26 +119,61 @@ def apply_llvm_obfuscation(source_file: str, rounds: int = 1, plugin_path: str =
     run_cmd(f"{llvm_dis} {obf_bc} -o {ll}")
 
     # Ghidra-Analyse ausführen
-    ghidra_output = run_ghidra_analysis(
-        binary_path=exe,
-        ghidra_dir=Path(ghidra_dir),
-        output_dir=source_dir / f"{base}_ghidra_project",
-        script_name=ghidra_script  # optional, z. B. Export script
-    )
+    #ghidra_output = run_ghidra_analysis(
+    #    binary_path=exe,
+    #    ghidra_dir=Path(ghidra_dir),
+    #    output_dir=source_dir / f"{base}_ghidra_project",
+    #    script_name=ghidra_script  # optional, z. B. Export script
+    #)
 
     return {
         "source_file": source_file,
         "bc_file": bc,
-        "obfuscated_bc": obf_bc,
-        "object_file": obj,
-        "executable": exe,
-        "llvm_ir": ll,
-        "ghidra_project_path": str(ghidra_output),
+        "obf_bc_file": obf_bc,
+        "obj_file": obj,
+        "exe_file": exe,
+        "llvm_ir_file": ll,
+       # "ghidra_project_path": str(ghidra_output),
         "source_file_sha256": sha256sum(source_file),
         "bc_file_sha256": sha256sum(bc),
         "obf_bc_file_sha256": sha256sum(obf_bc),
         "obj_file_sha256": sha256sum(obj),
         "exe_file_sha256": sha256sum(exe),
-        "ll_file_sha256": sha256sum(ll),
-        "ghidra_project_sha256": ghidra_output,
+        "llvm_ir_file_sha256": sha256sum(ll),
+
+      #  "ghidra_project_sha256": ghidra_output,
     }
+
+def load_preprocessed_data(source_file: str) -> Dict[str, str]:
+    # Erstelle ein Path-Objekt für den angegebenen Ordner
+    folder_path = Path(source_file)
+
+    # Überprüfen, ob der Ordner existiert
+    if not folder_path.is_dir():
+        raise ValueError(f"Der angegebene Ordner existiert nicht: {source_file}")
+
+    # Definition der gesuchten Dateinamen und Suffixe
+    files = {
+        "source_file": "*.c",
+        "bc_file": "*.bc",
+        "obf_bc_file": "*_obfuscated.bc",
+        "obj_file": "*_obfuscated.o",
+        "exe_file": "*_obfuscated",
+        "llvm_ir_file": "*_obfuscated.ll"
+    }
+
+    # Dictionary, um die gefundenen Dateipfade zu speichern
+    result = {}
+
+    # Suche nach den jeweiligen Dateien im Ordner
+    for key, pattern in files.items():
+        matching_files = list(folder_path.glob(pattern))
+
+        if matching_files:
+            # Wir nehmen nur das erste gefundene File (falls mehrere Übereinstimmungen)
+            result[key] = str(matching_files[0])
+            result[f"{key}_sha256"] = sha256sum(str(matching_files[0]))
+        else:
+            raise FileNotFoundError(f"Datei für {key} nicht gefunden im Ordner: {folder_path}")
+
+    return result

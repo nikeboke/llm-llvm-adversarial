@@ -4,7 +4,7 @@ from tkinter import messagebox, filedialog, scrolledtext, ttk
 import os
 import shutil
 
-from src.obfuscation.llvm_obfuscator import apply_llvm_obfuscation
+from src.obfuscation.llvm_obfuscator import apply_llvm_obfuscation,load_preprocessed_data
 
 
 class SimplifiedObfuscationGUI(tk.Tk):
@@ -109,61 +109,86 @@ class SimplifiedObfuscationGUI(tk.Tk):
             self.load_selected_file()
 
     def apply_obfuscation(self):
-        current_path  = Path.cwd()
+        # Basis-Pfade
+        current_path = Path.cwd()
         parent_path = current_path.parent.parent
-        obfusticated_base_path =  os.path.join(parent_path, "test_code", "obfuscated_code")
+        obfusticated_base_path = os.path.join(parent_path, "test_code", "obfuscated_code")
 
+        # Auswahl des Dateinamens und Ermittlung des Ordners
         filename = self.selected_file.get()
-        folder_name = os.path.splitext(filename)[0]
-        folder_path = obfusticated_base_path + "/" + folder_name
         if not filename:
             messagebox.showwarning("No File", "Please select a test file.")
             return
 
-        try:
-            Path(folder_path).mkdir(parents=True, exist_ok=False)
-            print(f"Ordner erstellt: {folder_path}")
-        except FileExistsError:
-            raise RuntimeError(f"Ordner existiert bereits: {folder_path}")
+        folder_name = os.path.splitext(filename)[0]
+        folder_path = obfusticated_base_path + "/" + folder_name
 
-        source_code = self.input_code.get("1.0", tk.END)
-        file_path = folder_path + "/" + filename
-        with open(file_path, "w") as f:
-            f.write(source_code)
+        rounds = 0
+        if self.use_llvm.get():
+            rounds = self.llvm_rounds.get()
 
-        try:
-            if self.use_llvm.get():
-                rounds = self.llvm_rounds.get()
-                result = apply_llvm_obfuscation(file_path, rounds=rounds)
+        # Prüfen, ob der Ordner bereits existiert
+        if not Path(folder_path).exists():
+            try:
+                Path(folder_path).mkdir(parents=True, exist_ok=False)
+                print(f"Ordner erstellt: {folder_path}")
 
-                source_file =  result["source_file"]
-                bc = result["bc_file"]
-                obf_bc = result["obfuscated_bc"]
-                obj  = result["object_file"]
-                exe = result["executable"]
-                ll = result["llvm_ir"]
-                sha256sum_source_file = result["source_file_sha256"]
-                sha256sum_bc = result["bc_file_sha256"]
-                sha256sum_obf_bc = result["obf_bc_file_sha256"]
-                sha256sum_obj = result["obj_file_sha256"]
-                sha256sum_exe = result["exe_file_sha256"]
-                sha256sum_ll = result["ll_file_sha256"]
+                # Quelle des Quellcodes
+                source_code = self.input_code.get("1.0", tk.END)
+                file_path = folder_path + "/" + filename
+                with open(file_path, "w") as f:
+                    f.write(source_code)
 
-                with open(ll, "r") as f:
-                    transformed = f.read()
-                result = f"LLVM Obfuscation applied ({rounds} round(s)).\nExecutable: {ll}\nChecksum: {sha256sum_ll}\n"
-            else:
-                transformed = source_code
-                result = "LLVM obfuscation skipped (code unchanged)."
+                # Obfuskation mit LLVM anwenden
+                try:
+                    if rounds > 0:
+                        result = apply_llvm_obfuscation(file_path, rounds=rounds)
+                    else:
+                        transformed = source_code
+                        result = "LLVM obfuscation skipped (code unchanged)."
 
-            self.result_text.delete("1.0", tk.END)
-            self.result_text.insert("1.0", transformed + "\n\n" + result)
+                except Exception as e:
+                    messagebox.showerror("Error", str(e))
 
-            self.analysis_output.delete("1.0", tk.END)
-            self.analysis_output.insert("1.0", self.fake_llm_analysis(transformed))
+            except FileExistsError:
+                raise RuntimeError(f"Ordner existiert bereits: {folder_path}")
 
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+        else:
+            # Wenn der Ordner bereits existiert, lade die generierten Daten und führe die Analyse aus
+            try:
+                # Quelle des Quellcodes aus der bestehenden Datei laden
+                result = load_preprocessed_data(folder_path)
+            except Exception as e:
+                messagebox.showerror("Error", f"Fehler beim Laden der Datei: {str(e)}")
+
+        # Ergebnisse der Obfuskation
+        ll_data,  ll_data_info = self._process_llvm_result(result, rounds)
+        # Process Data with LLMs
+
+        # Ausgabe der Resultate im GUI
+        self._update_gui_with_results(ll_data, ll_data_info)
+
+    def _process_llvm_result(self, result, rounds):
+        """Verarbeitet das Ergebnis der LLVM-Obfuskation."""
+        ll = result["llvm_ir_file"]
+        sha256sum_ll = result["llvm_ir_file_sha256"]
+
+        # Das transformierte Ergebnis und eine Checksumme erzeugen
+        with open(ll, "r") as f:
+            ll_data = f.read()
+
+        ll_data_info = f"LLVM Obfuscation applied ({rounds} round(s)).\nExecutable: {ll}\nChecksum: {sha256sum_ll}\n"
+        return ll_data,  ll_data_info
+
+    def _update_gui_with_results(self, transformed, result_message):
+        """Aktualisiert das GUI mit den Resultaten der Obfuskation und Analyse."""
+        # Anzeige des transformierten Codes im GUI
+        self.result_text.delete("1.0", tk.END)
+        self.result_text.insert("1.0", transformed + "\n\n" + result_message)
+
+        # Analyseergebnisse im GUI anzeigen
+        self.analysis_output.delete("1.0", tk.END)
+        self.analysis_output.insert("1.0", self.fake_llm_analysis(transformed))
 
     def fake_llm_analysis(self, code):
         lines = code.splitlines()
