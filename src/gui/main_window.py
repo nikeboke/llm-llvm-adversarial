@@ -5,7 +5,14 @@ import os
 import shutil
 
 from src.obfuscation.llvm_obfuscator import apply_llvm_obfuscation,load_preprocessed_data
+from src.llm_interface.llm_connector import analyze_file_with_multiple_models
 
+
+import torch
+print(torch.cuda.is_available())      # → Sollte True zurückgeben
+print(torch.version.cuda)             # → Gibt die verwendete CUDA-Version aus
+print(torch.__version__)
+print(torch.cuda.is_available())
 
 class SimplifiedObfuscationGUI(tk.Tk):
     def __init__(self):
@@ -188,12 +195,11 @@ class SimplifiedObfuscationGUI(tk.Tk):
 
         # Analyseergebnisse im GUI anzeigen
         self.analysis_output.delete("1.0", tk.END)
-        self.analysis_output.insert("1.0", self.fake_llm_analysis(transformed))
+        self.analysis_output.insert("1.0", self.llm_analysis(transformed))
 
-    def fake_llm_analysis(self, code):
-        lines = code.splitlines()
-        score = "High complexity" if "switch" in code or "state" in code else "Low complexity"
-        return f"LLM Analysis:\n- Approx. {len(lines)} lines\n- Obfuscation pattern detected: {score}\n"
+    def llm_analysis(self, code):
+        results = analyze_file_with_multiple_models(code)
+        return results
 
 
 if __name__ == "__main__":
